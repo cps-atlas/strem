@@ -1,38 +1,37 @@
 docs_dir: src/
 
 site_name: Spatio-Temporal Regular Expression Matching
-site_url: https://strem-org.github.io/strem
+site_url: https://cps-atlas.github.io/strem
 
-repo_url: https://github.com/strem-org/strem
-repo_name: strem-org/strem
+repo_url: https://github.com/cps-atlas/strem
+repo_name: cps-atlas/strem
 
 nav:
   - Home: index.md
   - Getting Started:
-      - Getting Started: started/index.md
-      - Features: started/features.md
-      - Running Example: started/example.md
+      - Installation: started/installation.md
+      - Examples: started/examples.md
   - Reference:
       - Spatial Regular Expressions: reference/spre.md
       - Data Schema: reference/schema.md
   - About:
       - Contributors: about/contributors.md
+      - Papers: about/papers.md
       - Contact: about/contact.md
-      - Publications: about/publications.md
 
 theme:
   name: material
   palette:
     - scheme: default
-      primary: red
-      accent: red
+      primary: blue grey
+      accent: blue grey
       toggle:
         icon: material/brightness-7
         name: Toggle Dark Mode
 
     - scheme: slate
-      primary: red
-      accent: red
+      primary: blue grey
+      accent: blue grey
       toggle:
         icon: material/brightness-4
         name: Toggle Light Mode
@@ -40,10 +39,10 @@ theme:
     - content.code.copy
     - content.code.annotate
     - navigation.instant
-    - navigation.tabs
     - navigation.indexes
     - navigation.top
     - navigation.footer
+    - navigation.expand
 
 copyright: Copyright &copy; 2023 - 2024 Spatial Regular Expression Matching Organization
 

@@ -1,8 +1,8 @@
-A Spatial Regular Expression (SpRE) is a spatial- and temporal-based pattern that describes a perception scenario of interest. This querying language is based on traditional Regular Expression patterns found in popular tools such as [grep](https://www.gnu.org/software/grep/manual/grep.html).
+A Spatial Regular Expression (SpRE) is a spatial- and temporal-based querying language that describes a perception scenario of interest. This querying language is based on traditional Regular Expression patterns found in popular tools such as [grep](https://www.gnu.org/software/grep/manual/grep.html).
 
 !!! example
 
-	Find two to five frames where a car and pedestrian are detected.
+	Find two to five frames where a car and pedestrian are present.
 
     ```
 	[[:car:] & [:pedestrian:]]{2,5}
@@ -27,6 +27,16 @@ The grammar below provides a method for developing valid SpRE patterns.
          | '<nonempty>' '(' <s4> ')'
 	     | <class>
 
+<s4m>    ::= '(' <s4m> ')'
+         | Real 
+         | Integer 
+         | '@' Identifier '(' <s4> ')'
+         | '@' Identifier '(' <s4> ',' <s4> ')' 
+         | '-' <s4m>
+         | <s4m> '-' <s4m> 
+         | <s4m> '*' <s4m> 
+         | <s4m> '/' <s4m>
+    
 <s4>     ::= '(' <s4> ')'
          | <s4> '&' <s4>
 	     | <s4> '|' <s4>
@@ -41,5 +51,3 @@ The grammar below provides a method for developing valid SpRE patterns.
          | '{' <integer> ',' '}'
 		 | '{' <integer> ',' <integer> '}'
 ```
-
-The `<string>` and `<integer>` rules follow C-like standards for valid tokens. For additional examples of SpRE patterns, see [here](https://github.com/strem-org/strem/tree/main/examples).

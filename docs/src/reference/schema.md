@@ -1,84 +1,99 @@
-This schema provides the structure for which all perception streams must adhere to in order to use the STREM tool, accordingly.
+The STREM tool currently accepts a strict data format to support spatial and temporal reasoning and querying over perception datastreams.
 
 ## Overview
 
-The schema is structured as a [JSON](https://www.json.org/json-en.html) object populated with all relevant data needed for searching over a perception stream.
+The schema is structured as a [JSON](https://www.json.org/json-en.html) object organized into the minimally relevant information to provide searching capabilities over the perception data.
+
 
 !!! example
+	 
+	 This example highlights a valid, STREM-accepted, format of a JSON object of one frame with two samples from two different channels.
+	 
+	 ```json
+	 {
+	   "version": "0.1.1",
+	   "frames": [
+	     {
+	       "index": 0,
+	       "samples": [
+	         {
+	           "type": "@stremf/sample/detection",
+	           "channel": "cam::front",
+	           "image": {
+	             "path": "train_images/image.png",
+	             "dimensions": {
+	               "width": 1920,
+	               "height": 1080
+	             }
+	           },
+	           "annotations": [
+	             {
+	               "class": "bus",
+	               "score": 0.76,
+	               "bbox": {
+	                 "type": "@stremf/bbox/obb",
+	                 "region": {
+	                   "center": {
+	                     "x": 1023.2516767573418,
+	                     "y": 1679.9571384868343
+	                   },
+	                   "dimensions": {
+	                     "w": 2.6459999999999066,
+	                     "h": 18.94800000000005
+	                   },
+	                   "rotation": -0.28776980428620613
+	                 }
+	               }
+	             },
+	 	    {
+	               "class": "pedestrian",
+	               "score": 0.82,
+	               "bbox": {
+	                 "type": "@stremf/bbox/aabb",
+	                 "region": {
+	                   "center": {
+	                     "x": 1023.2516767573418,
+	                     "y": 1679.9571384868343
+	                   },
+	                   "dimensions": {
+	                     "w": 2.6459999999999066,
+	                     "h": 18.94800000000005
+	                   },
+	                 }
+	               }
+	             }
+	           ]
+	         }
+	       ]
+	     }
+	   ]
+	 }
+	 ```
 
-	A valid perception data stream adhereing to the STREM format which contains a single frame where with one channel that contains two detections would look follows:
+## Schema
 
-    ```json
-	{
-		"version": "1.0.0",
-		"frames": [
-			{
-				"index": 0,
-				"timestamp": "00000012342",
-				"samples": [
-					{
-						"channel": "cam::back",
-						"timestamp": "0000131343243423",
-						"image": {
-							"path": "images/00000.png",
-							"dimensions": {
-								"width": 640,
-								"height": 480
-							}
-						},
-						"annotations": [
-							{
-								"class": "car",
-								"score": 1.00,
-								"bbox": {
-									"x": 922.065544729849,
-									"y": 1237.456155890169,
-									"w": 259.14260407440264,
-									"h": 291.2843224092133
-								}
-							},
-							{
-								"class": "pedestrian",
-								"score": 0.76,
-								"bbox": {
-									"x": 1064.6944198405668,
-									"y": 978.3135518157661,
-									"w": 156.69087688219645,
-									"h": 146.64658990256876
-								}
-							},
-						]
-					}
-				]
-			},
-		]
-	}
-	```
-
-
-## Format
-
-The format below is separated into four distinct JSON object literals (assuming curly braces surround each block to form a syntactically valid object).
+The schema is separated into four distinct JSON object literals.
 
 ```json
 "version": str,
 "frames": [ frame ]
 ```
 
+
 ```json title="frame"
 "index": int,
-"timestamp": str,
 "samples": [ sample ]
 ```
 
+
 ```json title="sample"
+"type": "@stremf/sample/detection",
 "channel": str,
-"timestamp": str,
 "image": {
-    "path": str,//(1)!
+    "path": str//(1)!,
     "dimensions": {
-        "width": int,
-        "height": int
+	    "width": int,
+	    "height": int
     }
 },
 "annotations": [ annotation ]
@@ -89,13 +104,43 @@ The format below is separated into four distinct JSON object literals (assuming 
 ```json title="annotation"
 "class": str,
 "score": float,
-"bbox": {
-    "x": int,//(1)!
-    "y": int,//(2)!
-    "w": int,
-    "h": int
-}
+"bbox": aabb | obb
 ```
 
-1. The `x` coordinate represents the left-most boundary of an axis-aligned bounding box.
-2. The `y` coordinate represents the top-most boundary of an axis-aligned bounding box.
+
+```json title="aabb"
+"type": "@stremf/bbox/aabb",
+"region": {
+	"center": {
+		"x": float,//(1)!
+		"y": float//(2)!
+	}
+	"dimensions": {
+		"w": float,
+		"h": float
+	}
+},
+```
+
+1. The `x` coordinate represents the horizontal center position of a bounding box.
+2. The `y` coordinate represents the vertical center position of a bounding box.
+
+
+```json title="obb"
+"type": "@stremf/bbox/obb",
+"region": {
+	"center": {
+		"x": float//(1)!,
+		"y": float//(2)!
+	}
+	"dimensions": {
+		"w": float,
+		"h": float
+	},
+	"rotation": float//(3)!
+},
+```
+
+1. The `x` coordinate represents the horizontal center position of a bounding box.
+2. The `y` coordinate represents the vertical center position of a bounding box.
+3. The units of the `rotation` field must be in radians.

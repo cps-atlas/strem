@@ -1,1 +1,1 @@
-This tool is developed and maintained by the *Future Research Department* at Toyota Research Institute of North America.
+This tool is developed and maintained by the *Future Mobility Research Department* at Toyota Research Institute of North America.
