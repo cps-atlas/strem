@@ -1,6 +1,6 @@
 [package]
 name = "strem"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Jacob Anderson <andersonjwan@gmail.com>"]
 edition = "2021"
 description = "A tool for spatial and temporal pattern matching over perception streams."
