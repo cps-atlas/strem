@@ -3,11 +3,14 @@
 //! Currently, the parser is manually implemented from a Context-Free Grammar
 //! (CFG) definition. For grammar details, see relevant function documentation.
 
-use super::ir::ast::{AbstractSyntaxTree, SpatialFormula};
-use super::ir::{
-    FolOperatorKind, Node, Operator, RangeKind, RegexOperatorKind, S4OperatorKind, S4uOperatorKind,
-    SpatialOperatorKind,
+use std::collections::HashMap;
+
+use super::ir::ast::{AbstractSyntaxTree, OperandKind, SpatialFormula};
+use super::ir::ops::{
+    FolOperatorKind, Operator, RangeKind, RegexOperatorKind, S4OperatorKind, S4mOperatorKind,
+    S4uOperatorKind, SpatialOperatorKind,
 };
+use super::ir::Node;
 use super::lexer::stream::TokenStream;
 use super::lexer::token::{Token, TokenKind, TokenKind::*};
 use super::listener::ErrorListener;
@@ -219,6 +222,9 @@ impl Parser {
     /// ```text
     /// pi ::= '(' pi ')' | pi '&' pi | pi '|' pi | NonEmpty class
     ///      | NonEmpty '(' tau ')' | class
+    ///      | 'E' '(' bindings ')' pi
+    ///      | 'A' '(' bindings ')' pi
+    ///      | psi < psi
     /// ```
     ///
     /// Note: The following symbol(s) have a different semantic meaning derived
@@ -289,6 +295,80 @@ impl Parser {
                     ));
                 }
 
+                Exists => {
+                    self.expect(Exists);
+                    self.expect(LeftParen);
+                    let table = self.parse_bindings();
+                    self.expect(RightParen);
+
+                    let child = self.parse_s4u();
+
+                    node = Some(Node::unary(
+                        Operator::SpatialOperator(SpatialOperatorKind::S4uOperator(
+                            S4uOperatorKind::Exists(table),
+                        )),
+                        child.unwrap(),
+                    ));
+                }
+
+                Forall => {
+                    self.expect(Forall);
+                    self.expect(LeftParen);
+                    let table = self.parse_bindings();
+                    self.expect(RightParen);
+
+                    let child = self.parse_s4u();
+
+                    node = Some(Node::unary(
+                        Operator::SpatialOperator(SpatialOperatorKind::S4uOperator(
+                            S4uOperatorKind::Forall(table),
+                        )),
+                        child.unwrap(),
+                    ));
+                }
+
+                At | Integer | Real | Minus => {
+                    let lhs = self.parse_s4m();
+
+                    let mut op = None;
+                    if let Some(token) = self.peek(1) {
+                        match token.kind {
+                            LeftChevron => {
+                                self.expect(LeftChevron);
+                                op = Some(Operator::SpatialOperator(
+                                    SpatialOperatorKind::FolOperator(FolOperatorKind::LessThan),
+                                ))
+                            }
+                            RightChevron => {
+                                self.expect(RightChevron);
+                                op = Some(Operator::SpatialOperator(
+                                    SpatialOperatorKind::FolOperator(FolOperatorKind::GreaterThan),
+                                ))
+                            }
+                            LeftChevronEqual => {
+                                self.expect(LeftChevronEqual);
+                                op = Some(Operator::SpatialOperator(
+                                    SpatialOperatorKind::FolOperator(
+                                        FolOperatorKind::LessThanEqualTo,
+                                    ),
+                                ))
+                            }
+                            RightChevronEqual => {
+                                self.expect(RightChevronEqual);
+                                op = Some(Operator::SpatialOperator(
+                                    SpatialOperatorKind::FolOperator(
+                                        FolOperatorKind::GreaterThanEqualTo,
+                                    ),
+                                ))
+                            }
+                            _ => self.error(),
+                        };
+                    }
+
+                    let rhs = self.parse_s4m();
+                    node = Some(Node::binary(op.unwrap(), lhs.unwrap(), rhs.unwrap()));
+                }
+
                 // class
                 LeftBracket => {
                     node = self.parse_class();
@@ -340,6 +420,201 @@ impl Parser {
         node
     }
 
+    /// Parse a set of bindings.
+    ///
+    /// This parse function captures the following grammar:
+    ///
+    /// ```text
+    /// bindings ::= Identifier Walrus class
+    ///            | Identifier Walrus class Comma bindings
+    /// ```
+    ///
+    fn parse_bindings(&mut self) -> HashMap<String, SpatialFormula> {
+        let mut table = HashMap::new();
+
+        let variable = self.expect(Identifier);
+        self.expect(Walrus);
+        let class = self.parse_class();
+
+        // Insert the quantified variable.
+        //
+        // This creates a new entry with the name of the variable that is
+        // associated with a [`class`].
+        table.insert(variable.lexeme, class.unwrap());
+
+        if let Some(token) = self.peek(1) {
+            match token.kind {
+                Comma => {
+                    self.expect(Comma);
+                    table.extend(self.parse_bindings());
+                }
+                _ => return table,
+            }
+        }
+
+        table
+    }
+
+    /// Parse an S4m-based expression.
+    ///
+    /// This parse function captures the following grammar:
+    ///
+    /// ```text
+    /// psi ::= '(' psi ')' | Real | Integer | '\' Identifier '(' tau ')'
+    ///       | '\' Identifier '(' tau ',' tau ')' | '-' psi
+    ///       | psi '-' psi | psi '*' psi | psi '/' psi
+    /// ```
+    fn parse_s4m(&mut self) -> Option<SpatialFormula> {
+        let mut node = None;
+
+        if let Some(token) = self.peek(1) {
+            match token.kind {
+                LeftParen => {
+                    self.expect(LeftParen);
+                    node = self.parse_s4m();
+                    self.expect(RightParen);
+                }
+
+                // function
+                At => {
+                    self.expect(At);
+                    let name = self.expect(Identifier);
+
+                    self.expect(LeftParen);
+                    let child = self.parse_s4();
+
+                    if let Some(peeked) = self.peek(1) {
+                        match peeked.kind {
+                            Comma => {
+                                self.expect(Comma);
+                                let right = self.parse_s4();
+
+                                node = Some(Node::binary(
+                                    Operator::SpatialOperator(SpatialOperatorKind::S4mOperator(
+                                        S4mOperatorKind::Function(name.lexeme),
+                                    )),
+                                    child.unwrap(),
+                                    right.unwrap(),
+                                ));
+                            }
+                            _ => {
+                                node = Some(Node::unary(
+                                    Operator::SpatialOperator(SpatialOperatorKind::S4mOperator(
+                                        S4mOperatorKind::Function(name.lexeme),
+                                    )),
+                                    child.unwrap(),
+                                ))
+                            }
+                        }
+                    }
+
+                    self.expect(RightParen);
+                }
+
+                // reals
+                Real => {
+                    let number = self.expect(Real);
+                    node = Some(Node::from(OperandKind::Number(
+                        number.lexeme.parse().unwrap(),
+                    )));
+                }
+
+                // integer
+                Integer => {
+                    let number = self.expect(Integer);
+                    node = Some(Node::from(OperandKind::Number(
+                        number.lexeme.parse().unwrap(),
+                    )));
+                }
+
+                // inverse
+                Minus => {
+                    self.expect(Minus);
+                    let child = self.parse_s4m();
+
+                    node = Some(Node::unary(
+                        Operator::SpatialOperator(SpatialOperatorKind::S4mOperator(
+                            S4mOperatorKind::Inverse,
+                        )),
+                        child.unwrap(),
+                    ));
+                }
+
+                _ => self.error(),
+            }
+        } else {
+            self.error();
+        }
+
+        while let Some(token) = self.peek(1) {
+            if token.kind != EndOfFile {
+                match token.kind {
+                    // addition
+                    Plus => {
+                        self.expect(Plus);
+
+                        let rhs = self.parse_s4m();
+                        node = Some(Node::binary(
+                            Operator::SpatialOperator(SpatialOperatorKind::S4mOperator(
+                                S4mOperatorKind::Addition,
+                            )),
+                            node.unwrap(),
+                            rhs.unwrap(),
+                        ));
+                    }
+
+                    // subtraction
+                    Minus => {
+                        self.expect(Minus);
+
+                        let rhs = self.parse_s4m();
+                        node = Some(Node::binary(
+                            Operator::SpatialOperator(SpatialOperatorKind::S4mOperator(
+                                S4mOperatorKind::Subtraction,
+                            )),
+                            node.unwrap(),
+                            rhs.unwrap(),
+                        ));
+                    }
+
+                    // multiplication
+                    Star => {
+                        self.expect(Star);
+
+                        let rhs = self.parse_s4m();
+                        node = Some(Node::binary(
+                            Operator::SpatialOperator(SpatialOperatorKind::S4mOperator(
+                                S4mOperatorKind::Multiplication,
+                            )),
+                            node.unwrap(),
+                            rhs.unwrap(),
+                        ));
+                    }
+
+                    // division
+                    Slash => {
+                        self.expect(Slash);
+
+                        let rhs = self.parse_s4m();
+                        node = Some(Node::binary(
+                            Operator::SpatialOperator(SpatialOperatorKind::S4mOperator(
+                                S4mOperatorKind::Division,
+                            )),
+                            node.unwrap(),
+                            rhs.unwrap(),
+                        ));
+                    }
+
+                    _ => break,
+                }
+            } else {
+                break;
+            }
+        }
+
+        node
+    }
+
     /// Parse an S4-based expression.
     ///
     /// This parse function captures the following grammar:
@@ -363,6 +638,11 @@ impl Parser {
                     self.expect(LeftParen);
                     node = self.parse_s4();
                     self.expect(RightParen);
+                }
+
+                Identifier => {
+                    let name = self.expect(Identifier);
+                    node = Some(Node::from(OperandKind::Variable(name.lexeme)));
                 }
 
                 // complementation
@@ -453,7 +733,7 @@ impl Parser {
         self.expect(Colon);
         self.expect(RightBracket);
 
-        Some(Node::from(name))
+        Some(Node::from(OperandKind::Symbol(name)))
     }
 
     /// Parse a range.

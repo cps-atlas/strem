@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use self::bbox::BoundingBox;
+
+pub mod bbox;
+
 /// A sample record of object detections produced for a single frame.
 ///
 /// This includes the labels and regions associated with such. Furthermore,
@@ -8,7 +12,6 @@ use std::path::PathBuf;
 #[derive(Clone, Debug)]
 pub struct DetectionRecord {
     pub channel: String,
-    pub timestamp: f64,
     pub image: Option<Image>,
 
     /// A mapping between labels and annotations (i.e., bounding boxes).
@@ -17,10 +20,9 @@ pub struct DetectionRecord {
 
 impl DetectionRecord {
     /// Create a new [`DetectionRecord`].
-    pub fn new(channel: String, timestamp: f64, image: Option<Image>) -> Self {
+    pub fn new(channel: String, image: Option<Image>) -> Self {
         DetectionRecord {
             channel,
-            timestamp,
             image,
             annotations: HashMap::new(),
         }
@@ -45,37 +47,6 @@ impl Annotation {
     }
 }
 
-/// An Axis-Aligned Bounding Box (AABB).
-///
-/// The selected representation of the AABB uses the major and minor coordinates
-/// (i.e., the corners) to represent the rectangle.
-#[derive(Clone, Debug)]
-pub struct BoundingBox {
-    pub min: Point,
-    pub max: Point,
-}
-
-impl BoundingBox {
-    /// Create a new [`BoundingBox`] using min/max coordinates.
-    pub fn new(min: Point, max: Point) -> Self {
-        BoundingBox { min, max }
-    }
-}
-
-/// A Z axis-aligned point (i.e., 2D).
-#[derive(Clone, Debug)]
-pub struct Point {
-    pub x: f64,
-    pub y: f64,
-}
-
-impl Point {
-    /// Create a new [`Point`] with (x, y) coordinates.
-    pub fn new(x: f64, y: f64) -> Self {
-        Point { x, y }
-    }
-}
-
 /// An interface to handle image metadata.
 ///
 /// This includes source, dimensions, and any additional data that would be
@@ -83,13 +54,13 @@ impl Point {
 #[derive(Clone, Debug)]
 pub struct Image {
     pub source: ImageSource,
-    pub width: f64,
-    pub height: f64,
+    pub width: u32,
+    pub height: u32,
 }
 
 impl Image {
     /// Create a new [`Image`].
-    pub fn new(source: ImageSource, width: f64, height: f64) -> Self {
+    pub fn new(source: ImageSource, width: u32, height: u32) -> Self {
         Image {
             source,
             width,

@@ -9,6 +9,7 @@ use crate::compiler::ir::{ast::SpatialFormula, Node};
 ///
 /// This maps a [`SpatialFormula`] to a unique symbol that is used when
 /// performing matching.
+#[derive(Debug)]
 pub struct SymbolicFormula {
     pub symbol: char,
     pub formula: SpatialFormula,
@@ -24,6 +25,7 @@ impl SymbolicFormula {
 ///
 /// Within this AST, each internal node is a RE-based operation (e.g.,
 /// alternation, concatenation, etc); and each operand is a [`SymbolicFormula`].
+#[derive(Debug)]
 pub struct SymbolicAbstractSyntaxTree {
     pub root: Option<Node<SymbolicFormula>>,
 }
@@ -51,9 +53,9 @@ impl SymbolicAbstractSyntaxTree {
         match node {
             Node::Operand(sformula) => vec![sformula],
             Node::UnaryExpr { child, .. } => SymbolicAbstractSyntaxTree::fmapit(child),
-            Node::BinaryExpr { left, right, .. } => {
-                let mut formulas = SymbolicAbstractSyntaxTree::fmapit(left);
-                formulas.extend(SymbolicAbstractSyntaxTree::fmapit(right));
+            Node::BinaryExpr { lhs, rhs, .. } => {
+                let mut formulas = SymbolicAbstractSyntaxTree::fmapit(lhs);
+                formulas.extend(SymbolicAbstractSyntaxTree::fmapit(rhs));
 
                 formulas
             }

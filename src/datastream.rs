@@ -4,70 +4,60 @@
 
 use std::error::Error;
 use std::fmt;
-use std::path::Path;
+use std::io::Read;
 
-use self::exporter::DataExport;
+use serde_json::de::IoRead;
+use serde_json::StreamDeserializer;
+
 use self::frame::Frame;
-use self::importer::DataImport;
+use self::io::importer::Importer;
 
-pub mod exporter;
 pub mod frame;
-pub mod importer;
+pub mod io;
 
 /// An interface to interact with perception stream data.
 ///
 /// It should be further noted that this interface provides basic mechanisms to
 /// reading/writing of the stream regardless of offline/online application.
-#[derive(Default)]
-pub struct DataStream {
+pub struct DataStream<'a, R: Read> {
     pub frames: Vec<Frame>,
 
-    /// The [`DataImport`] to retrieve [`Frame`] from.
-    pub importer: Option<Box<dyn DataImport>>,
-
-    /// The [`DataExport`] to write [`Frame`] from.
-    pub exporter: Option<Box<dyn DataExport>>,
+    /// The source from which data is loaded.
+    pub stream: StreamDeserializer<'a, IoRead<R>, io::DataStream>,
 
     /// A limit on the number of frames to keep in memory.
     pub capacity: Option<usize>,
 }
 
-impl DataStream {
+impl<R: Read> DataStream<'_, R> {
     /// Create a new [`DataStream`] with the selected format.
     ///
     /// This function creates an empty [`DataStream`] instance that still must
     /// be further populated with frames.
-    pub fn new() -> Self {
+    pub fn new(source: R) -> Self {
+        let stream = StreamDeserializer::new(IoRead::new(source));
+
         DataStream {
             frames: Vec::new(),
-            importer: None,
-            exporter: None,
             capacity: None,
+            stream,
         }
     }
 
     /// Set the `capacity` of the [`DataStream`].
-    pub fn capacity(mut self, size: usize) -> Self {
+    pub fn capacity(&mut self, size: usize) {
         self.capacity = Some(size);
-        self
-    }
-
-    /// Set the [`DataImport`].
-    pub fn importer(mut self, importer: Box<dyn DataImport>) -> Self {
-        self.importer = Some(importer);
-        self
     }
 
     /// Request the next frame from the [`DataImport`].
     pub fn request(
         &mut self,
-        channels: &Option<Vec<String>>,
-    ) -> Result<Option<Frame>, Box<dyn Error>> {
-        if let Some(importer) = &mut self.importer {
-            return importer.import(channels);
+        importer: &mut Importer,
+    ) -> Result<Option<Vec<Frame>>, Box<dyn Error>> {
+        match self.stream.next() {
+            Some(data) => importer.import(data?),
+            None => Ok(None),
         }
-
-        Err(Box::new(DataStreamError::from("missing data port")))
     }
 
     /// Insert a [`Frame`] at the specified index.
@@ -86,26 +76,9 @@ impl DataStream {
     pub fn append(&mut self, frame: Frame) {
         self.insert(self.frames.len(), frame);
     }
-
-    /// Set the [`DataExport`].
-    pub fn exporter(mut self, exporter: Box<dyn DataExport>) -> Self {
-        self.exporter = Some(exporter);
-        self
-    }
-
-    /// Export the [`DataStream`] to a file.
-    ///
-    /// This uses the provided `self::exporter`, accordingly.
-    pub fn export(&self, outfile: &Path) -> Result<(), Box<dyn Error>> {
-        if let Some(exporter) = &self.exporter {
-            return exporter.export(&self.frames, outfile);
-        }
-
-        Err(Box::new(DataStreamError::from("missing exporter")))
-    }
 }
 
-impl fmt::Debug for DataStream {
+impl<'a, R: Read> fmt::Debug for DataStream<'a, R> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("DataStream")
             .field("frames", &self.frames)

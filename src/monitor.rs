@@ -8,6 +8,7 @@ use crate::datastream::frame::sample::Sample;
 use crate::datastream::frame::Frame;
 
 pub mod s4;
+pub mod s4m;
 pub mod s4u;
 
 /// The main monitor.
@@ -32,7 +33,7 @@ impl Monitor {
         for sample in frame.samples.iter() {
             match sample {
                 Sample::ObjectDetection(record) => {
-                    if s4u::Monitor::evaluate(&record.annotations, formula) {
+                    if s4u::Monitor::evaluate(&record.annotations, None, formula) {
                         return true;
                     }
                 }

@@ -11,7 +11,6 @@ pub mod sample;
 #[derive(Clone, Debug)]
 pub struct Frame {
     pub index: usize,
-    pub timestamp: f64,
 
     // A mapping between the channel name and data sample
     pub samples: Vec<Sample>,
@@ -19,10 +18,9 @@ pub struct Frame {
 
 impl Frame {
     /// Create a new [`Frame`].
-    pub fn new(index: usize, timestamp: f64) -> Self {
+    pub fn new(index: usize) -> Self {
         Frame {
             index,
-            timestamp,
             samples: Vec::new(),
         }
     }

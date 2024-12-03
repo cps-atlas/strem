@@ -9,9 +9,8 @@ use clap::{Arg, ArgAction, Command};
 ///
 /// The structure of the command is organized follows: (1) parser settings,
 /// (2) tool information, (3) positional arguments, (4) flags, and (5) options.
-#[allow(clippy::let_and_return)]
 pub fn build() -> Command {
-    let cmd = Command::new(clap::crate_name!())
+    Command::new(clap::crate_name!())
         .help_expected(true)
         .dont_collapse_args_in_usage(true)
         .version(clap::crate_version!())
@@ -38,7 +37,7 @@ pub fn build() -> Command {
         )
         .arg(
             Arg::new("DATASTREAM")
-                .action(ArgAction::Set)
+                .action(ArgAction::Append)
                 .value_parser(clap::value_parser!(PathBuf))
                 .help("The perception data stream to search over"),
         )
@@ -67,18 +66,28 @@ pub fn build() -> Command {
                 .action(ArgAction::Set)
                 .value_parser(clap::value_parser!(usize))
                 .help("Stop searching after `NUM` matches found"),
-        );
-
-    #[cfg(feature = "export")]
-    let cmd = cmd.arg(
-        Arg::new("export")
-            .short('x')
-            .long("export")
-            .value_name("DIR")
-            .action(ArgAction::Set)
-            .value_parser(clap::value_parser!(PathBuf))
-            .help("Export results to directory"),
-    );
-
-    cmd
+        )
+        .arg(
+            Arg::new("export")
+                .short('x')
+                .long("export")
+                .action(ArgAction::SetTrue)
+                .help("Export the data of a match"),
+        )
+        .arg(
+            Arg::new("quiet")
+                .short('q')
+                .long("quiet")
+                .action(ArgAction::SetTrue)
+                .help("Do not write to standard output"),
+        )
+        .arg(
+            Arg::new("skip")
+                .short('s')
+                .long("skip")
+                .value_name("NUM")
+                .action(ArgAction::Set)
+                .value_parser(clap::value_parser!(usize))
+                .help("Skip the first `NUM` frames"),
+        )
 }

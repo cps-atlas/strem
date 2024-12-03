@@ -19,12 +19,17 @@ pub struct Configuration<'a> {
     pub online: bool,
 
     /// A collection of channels to import.
-    pub channels: Option<Vec<String>>,
+    pub channels: Option<Vec<&'a String>>,
 
     /// Maximum number of matches to search for.
     pub limit: Option<usize>,
 
-    /// Draw frames.
-    #[cfg(feature = "export")]
-    pub export: Option<&'a PathBuf>,
+    /// Export the data of a match.
+    pub export: bool,
+
+    /// Do not print anything.
+    pub quiet: bool,
+
+    /// Ignore the first `skip` amount of frames.
+    pub skip: Option<usize>,
 }

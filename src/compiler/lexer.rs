@@ -93,15 +93,37 @@ impl Lexer {
             '}' => Ok(self.tokenize(RightBrace)),
             '[' => Ok(self.tokenize(LeftBracket)),
             ']' => Ok(self.tokenize(RightBracket)),
-            '<' => Ok(self.functionify(LeftChevron)),
-            '>' => Ok(self.tokenize(RightChevron)),
+            '<' => match self.peek(0) {
+                Some('=') => {
+                    self.advance();
+                    Ok(self.tokenize(LeftChevronEqual))
+                }
+                _ => Ok(self.tokenize(LeftChevron)),
+            },
+            '>' => match self.peek(0) {
+                Some('=') => {
+                    self.advance();
+                    Ok(self.tokenize(RightChevronEqual))
+                }
+                _ => Ok(self.tokenize(RightChevron)),
+            },
             ',' => Ok(self.tokenize(Comma)),
-            ':' => Ok(self.tokenize(Colon)),
+            ':' => match self.peek(0) {
+                Some('=') => {
+                    self.advance();
+                    Ok(self.tokenize(Walrus))
+                }
+                _ => Ok(self.tokenize(Colon)),
+            },
             '*' => Ok(self.tokenize(Star)),
             '%' => Ok(self.tokenize(Percent)),
             '!' => Ok(self.tokenize(Not)),
             '&' => Ok(self.tokenize(And)),
             '|' => Ok(self.tokenize(Or)),
+            '@' => Ok(self.tokenize(At)),
+            '-' => Ok(self.tokenize(Minus)),
+            '+' => Ok(self.tokenize(Plus)),
+            '/' => Ok(self.tokenize(Slash)),
             '\n' => Ok(self.newline()),
             ' ' | '\r' | '\t' => Ok(self.skip(0)),
             '0'..='9' => Ok(self.numberify()),
@@ -128,37 +150,6 @@ impl Lexer {
             Position(self.line, self.base - self.column),
             lexeme,
         ))
-    }
-
-    /// Advance the [`current`](Lexer::current), capturing the function.
-    ///
-    /// This method is used for identifying functions that are bounded with a
-    /// left and right chevron (e.g., `<FUNCTION-NAME>`).
-    fn functionify(&mut self, kind: TokenKind) -> Option<Token> {
-        if let Some('a'..='z' | 'A'..='Z' | '_') = self.peek(0) {
-            let name = self.identifierify().unwrap().lexeme;
-            self.advance();
-
-            self.tokenize(self.functionit(name).unwrap())
-        } else {
-            self.tokenize(kind)
-        }
-    }
-
-    /// Map the function's name to an equivalent [`TokenKind`].
-    ///
-    /// The name of the function is case-sensitive.
-    fn functionit(&self, name: String) -> Option<TokenKind> {
-        match &name[1..] {
-            "nonempty" => Some(NonEmpty),
-            _ => match &self.listener {
-                Some(listener) => {
-                    listener.exit(format!("lexer: `{}` function not supported.", name), 1);
-                    None
-                }
-                None => panic!(),
-            },
-        }
     }
 
     /// Advance the [`current`](Lexer::current), greedily consuming number characters.
@@ -205,7 +196,20 @@ impl Lexer {
             }
         }
 
-        self.tokenize(Identifier)
+        // Check if it is a reserved word.
+        //
+        // If a keyword is used, then a specified token kind should be created
+        // instead of a generic [`Identifier`].
+        if let Some(token) = self.tokenize(Identifier) {
+            match &token.lexeme[..] {
+                "NE" => return self.tokenize(NonEmpty),
+                "E" => return self.tokenize(Exists),
+                "A" => return self.tokenize(Forall),
+                _ => return Some(token),
+            };
+        };
+
+        None
     }
 
     /// Lookahead a number of characters into the character stream.

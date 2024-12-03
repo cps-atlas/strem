@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
-use crate::compiler::ir::ast::SpatialFormula;
-use crate::compiler::ir::{Node, Operator, S4OperatorKind, SpatialOperatorKind};
-use crate::datastream::frame::sample::detections::{Annotation, BoundingBox, Point};
+use crate::compiler::ir::ast::{OperandKind, SpatialFormula};
+use crate::compiler::ir::ops::{Operator, S4OperatorKind, SpatialOperatorKind};
+use crate::compiler::ir::Node;
+use crate::datastream::frame::sample::detections::Annotation;
 
 /// A monitor for evaluating S4 formulas.
 #[derive(Default)]
@@ -19,18 +20,35 @@ impl Monitor {
     /// else, if false, then it is not satisfied.
     pub fn evaluate(
         detections: &HashMap<String, Vec<Annotation>>,
+        table: Option<&HashMap<String, Annotation>>,
         formula: &SpatialFormula,
     ) -> Vec<Annotation> {
         match formula {
-            Node::Operand(label) => {
-                // Retrieve an annotation with the same class category as
-                // specified by the label.
-                if let Some(annotation) = detections.get(label) {
-                    return annotation.clone();
-                }
+            Node::Operand(op) => match op {
+                OperandKind::Symbol(label) => {
+                    // Retrieve an annotation with the same class category as
+                    // specified by the label.
+                    if let Some(annotations) = detections.get(label) {
+                        return annotations.clone();
+                    }
 
-                Vec::new()
-            }
+                    Vec::new()
+                }
+                OperandKind::Variable(name) => {
+                    // Retrieve annoation by look-up.
+                    //
+                    // If no entry exists on the table, return an empty list,
+                    // accordingly.
+                    if let Some(table) = table {
+                        if let Some(annotation) = table.get(name) {
+                            return vec![annotation.clone()];
+                        }
+                    }
+
+                    Vec::new()
+                }
+                _ => panic!("monitor: s4: operand: unsupported `{:?}`", op),
+            },
             Node::UnaryExpr { op, .. } => match op {
                 Operator::SpatialOperator(SpatialOperatorKind::S4Operator(
                     S4OperatorKind::Complement,
@@ -39,26 +57,26 @@ impl Monitor {
                 }
                 _ => panic!("monitor: s4: unrecognized unary operator"),
             },
-            Node::BinaryExpr { op, left, right } => {
-                let left = Monitor::evaluate(detections, left);
-                let right = Monitor::evaluate(detections, right);
+            Node::BinaryExpr { op, lhs, rhs } => {
+                let lhs = Monitor::evaluate(detections, table, lhs);
+                let rhs = Monitor::evaluate(detections, table, rhs);
 
                 match op {
                     Operator::SpatialOperator(op) => match op {
                         SpatialOperatorKind::S4Operator(op) => match op {
                             S4OperatorKind::Intersection => {
-                                // If either left or right is empty, then one
+                                // If either left or rhs is empty, then one
                                 // side is not satisfied. Therefore, the
                                 // resulting formula is not satisifed, entirely.
-                                if left.is_empty() || right.is_empty() {
+                                if lhs.is_empty() || rhs.is_empty() {
                                     return Vec::new();
                                 }
 
                                 let mut intersections = Vec::new();
 
-                                for l in left.iter() {
-                                    for r in right.iter() {
-                                        if let Some(_bbox) = Self::intersection(&l.bbox, &r.bbox) {
+                                for l in lhs.iter() {
+                                    for r in rhs.iter() {
+                                        if l.bbox.intersects(&r.bbox).is_some() {
                                             intersections.push(l.clone());
                                             intersections.push(r.clone());
                                         }
@@ -71,7 +89,7 @@ impl Monitor {
                                 // We don't care which one satisfied---just as
                                 // long as left or right is valid. Therefore, we
                                 // append all solutions.
-                                left.into_iter().chain(right).collect()
+                                lhs.into_iter().chain(rhs).collect()
                             }
                             _ => panic!("monitor: s4: unknown binary operator"),
                         },
@@ -81,28 +99,5 @@ impl Monitor {
                 }
             }
         }
-    }
-
-    /// Compute the intersection of two bounding boxes.
-    ///
-    /// If no intersection exists, then [`None`] is returned which is
-    /// semantically equivalent to the empty set.
-    fn intersection(a: &BoundingBox, b: &BoundingBox) -> Option<BoundingBox> {
-        // check if overlap exists
-        if a.min.x < b.max.x && b.min.x < a.max.x && a.min.y < b.max.y && b.min.y < a.max.y {
-            let min = Point::new(
-                std::cmp::max(a.min.x as i64, b.min.x as i64) as f64,
-                std::cmp::max(a.min.y as i64, b.min.y as i64) as f64,
-            );
-
-            let max = Point::new(
-                std::cmp::min(a.max.x as i64, b.max.x as i64) as f64,
-                std::cmp::min(a.max.y as i64, b.max.y as i64) as f64,
-            );
-
-            return Some(BoundingBox::new(min, max));
-        }
-
-        None
     }
 }

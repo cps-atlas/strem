@@ -10,16 +10,19 @@ use std::process;
 mod app;
 mod cli;
 
+use strem::controller::Status;
+
 use crate::app::App;
 
 fn main() {
     let app = App::new(cli::build().get_matches());
 
     match app.run() {
-        Ok(..) => process::exit(0),
+        Ok(Status::MatchFound) => process::exit(0),
+        Ok(Status::MatchNotFound) => process::exit(1),
         Err(e) => {
             eprintln!("strem: error: {}", e);
-            process::exit(1);
+            process::exit(2);
         }
     }
 }

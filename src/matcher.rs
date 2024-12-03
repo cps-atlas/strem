@@ -3,7 +3,8 @@
 
 use std::error::Error;
 
-use crate::compiler::ir::{Node, Operator, RangeKind, RegexOperatorKind};
+use crate::compiler::ir::ops::{Operator, RangeKind, RegexOperatorKind};
+use crate::compiler::ir::Node;
 use crate::datastream::frame::Frame;
 use crate::symbolizer::ast::{SymbolicAbstractSyntaxTree, SymbolicFormula};
 
@@ -73,17 +74,96 @@ fn regexit(node: &Node<SymbolicFormula>) -> String {
                 _ => String::new(),
             }
         }
-        Node::BinaryExpr { op, left, right } => {
-            let left = self::regexit(left);
-            let right = self::regexit(right);
+        Node::BinaryExpr { op, lhs, rhs } => {
+            let lhs = self::regexit(lhs);
+            let rhs = self::regexit(rhs);
 
             match op {
                 Operator::RegexOperator(kind) => match kind {
-                    RegexOperatorKind::Concatenation => format!("({}{})", left, right),
-                    RegexOperatorKind::Alternation => format!("({}|{})", left, right),
+                    RegexOperatorKind::Concatenation => format!("({}{})", lhs, rhs),
+                    RegexOperatorKind::Alternation => format!("({}|{})", lhs, rhs),
                     _ => String::new(),
                 },
                 _ => String::new(),
+            }
+        }
+    }
+}
+
+/// Compute the horizon of a Regular Expression (RE).
+///
+/// This traverses the outer components of a SpRE related solely to the RE-based
+/// patterns and symbols.
+pub fn horizon(ast: &SymbolicAbstractSyntaxTree) -> Option<usize> {
+    if let Some(root) = &ast.root {
+        return self::horizonit(root);
+    }
+
+    None
+}
+
+/// Recursively compute the horizon of an RE.
+///
+/// This is a helper function that walks the root [`Node`] of a
+/// [`SymbolicAbstractSyntaxTree`] to build the appropriate pattern.
+fn horizonit(node: &Node<SymbolicFormula>) -> Option<usize> {
+    match node {
+        Node::Operand(..) => Some(1),
+        Node::UnaryExpr { op, child } => {
+            let ret = self::horizonit(child);
+
+            match op {
+                Operator::RegexOperator(kind) => match kind {
+                    RegexOperatorKind::KleeneStar => None,
+                    RegexOperatorKind::Range(kind) => match kind {
+                        RangeKind::Exactly(size) => {
+                            if let Some(ret) = ret {
+                                return Some(ret * (*size));
+                            }
+
+                            None
+                        }
+                        RangeKind::AtLeast(..) => None,
+                        RangeKind::Between(.., max) => {
+                            if let Some(ret) = ret {
+                                return Some(ret * (*max));
+                            }
+
+                            None
+                        }
+                    },
+                    _ => None,
+                },
+                _ => None,
+            }
+        }
+        Node::BinaryExpr { op, lhs, rhs } => {
+            let lhs = self::horizonit(lhs);
+            let rhs = self::horizonit(rhs);
+
+            match op {
+                Operator::RegexOperator(kind) => match kind {
+                    RegexOperatorKind::Concatenation => {
+                        if let Some(lhs) = lhs {
+                            if let Some(rhs) = rhs {
+                                return Some(lhs + rhs);
+                            }
+                        }
+
+                        None
+                    }
+                    RegexOperatorKind::Alternation => {
+                        if let Some(lhs) = lhs {
+                            if let Some(rhs) = rhs {
+                                return Some(std::cmp::max(lhs, rhs));
+                            }
+                        }
+
+                        None
+                    }
+                    _ => None,
+                },
+                _ => None,
             }
         }
     }

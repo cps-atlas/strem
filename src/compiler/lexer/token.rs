@@ -23,6 +23,15 @@ pub enum TokenKind {
     Real,
     Identifier,
     NonEmpty,
+    Exists,
+    Forall,
+    Walrus,
+    At,
+    Minus,
+    Plus,
+    Slash,
+    LeftChevronEqual,
+    RightChevronEqual,
 }
 
 /// Locational information used in a [`Token`].

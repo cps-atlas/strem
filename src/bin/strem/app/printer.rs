@@ -4,51 +4,74 @@
 use std::error::Error;
 use std::fmt;
 
-#[cfg(feature = "export")]
-use std::path::PathBuf;
-
+use colored::*;
 use strem::config::Configuration;
 use strem::datastream::frame::Frame;
-
-#[cfg(feature = "export")]
-pub mod imager;
+use strem::datastream::io::exporter::DataExporter;
 
 pub struct Printer {}
 
 impl Printer {
     /// Print a [`Match`].
     pub fn print(frames: &[Frame], config: &Configuration) -> Result<(), Box<dyn Error>> {
-        let prefix = if let Some(path) = config.datastream {
-            path.display().to_string()
-        } else {
-            String::from("")
-        };
+        if config.quiet {
+            return Ok(());
+        }
 
-        println!(
-            "{}: {:?}..{:?}",
-            prefix,
-            frames.first().unwrap().index,
-            frames.last().unwrap().index + 1
-        );
+        let mut msg = String::new();
 
-        #[cfg(feature = "export")]
-        if let Some(outdir) = config.export {
-            let imager = imager::Imager::new();
+        if let Some(path) = config.datastream {
+            let prefix = path.display().to_string();
 
-            let mut indir = PathBuf::new();
+            // Print the prefix.
+            //
+            // This also includes coloring the text appropriately.
+            msg = Self::delimit(msg);
+            msg = format!("{}{}", msg, prefix.magenta());
+        }
 
-            if let Some(path) = config.datastream {
-                if let Some(parent) = path.parent() {
-                    indir.push(parent);
-                }
-            }
+        // Print the bounds of the [`Frame`] set.
+        //
+        // If true, the boundary [start, end) will be printed to the
+        // terminal, accordingly.
+        let start = frames.first().unwrap().index;
+        let end = frames.last().unwrap().index + 1;
 
-            for frame in frames.iter() {
-                imager.draw(frame, &indir, outdir)?;
-            }
+        // Print the interval of the match.
+        //
+        // This also includes coloring the text appropriately.
+        msg = Self::delimit(msg);
+        msg = format!("{}{}", msg, format!("{}..{}", start, end).green());
+
+        if config.export {
+            let s = serde_json::to_string(&DataExporter::new().export(frames)?)?;
+
+            // Print the exported data.
+            //
+            // This also includes coloring the text appropriately.
+            msg.clear();
+            msg = Self::delimit(msg);
+            msg = format!("{}{}", msg, s.red());
+        }
+
+        // Print a the message, accordingly.
+        if !msg.is_empty() {
+            println!("{}", msg);
         }
 
         Ok(())
+    }
+
+    fn delimit(msg: String) -> String {
+        // If the [`msg`] is not empty, then add delimeter.
+        //
+        // This is used for visual clarity as well as improving the parse-ability
+        // of the resulting outputs for post-processing.
+        if !msg.is_empty() {
+            return format!("{}{}", msg, ":".cyan());
+        }
+
+        msg
     }
 }
 

@@ -63,11 +63,11 @@ impl<'a> Symbolizer<'a> {
                 let child = self.symbolizeit(*child)?;
                 Ok(Node::unary(op, child))
             }
-            Node::BinaryExpr { op, left, right } => {
-                let left = self.symbolizeit(*left)?;
-                let right = self.symbolizeit(*right)?;
+            Node::BinaryExpr { op, lhs, rhs } => {
+                let lhs = self.symbolizeit(*lhs)?;
+                let rhs = self.symbolizeit(*rhs)?;
 
-                Ok(Node::binary(op, left, right))
+                Ok(Node::binary(op, lhs, rhs))
             }
         }
     }
