@@ -10,3 +10,7 @@ cargo install --path .
 ```
 
 After installation, run the command `strem -h` from your preferred terminal to view its usage.
+
+## Instruction
+
+For further instructions on documentation, running examples, and an in-depth review of the formats accepted by the tool to start searching, please refer to https://cps-atlas.github.io/strem/.
