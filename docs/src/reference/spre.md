@@ -16,20 +16,20 @@ The grammar below provides a method for developing valid SpRE patterns.
 <spre>   ::= '(' <spre> ')'
          | <spre> '*'
          | <spre> <spre>
-	 | <spre> '|' <spre>
-	 | <spre> <range>
-	 | '[' <s4u> ']'
+         | <spre> '|' <spre>
+         | <spre> <range>
+         | '[' <s4u> ']'
 	   
 <s4u>    ::= '(' <s4u> ')'
          | <s4u> '&' <s4u>
          | <s4u> '|' <s4u>
-	 | 'NE' <class>
+         | 'NE' <class>
          | 'NE' '(' <s4> ')'
          | <s4m> '<' <s4m>
          | <s4m> '>' <s4m>
          | <s4m> '<=' <s4m>
          | <s4m> '>=' <s4m>
-	 | <class>
+         | <class>
 
 <s4m>    ::= '(' <s4m> ')'
          | Real 
@@ -43,9 +43,9 @@ The grammar below provides a method for developing valid SpRE patterns.
     
 <s4>     ::= '(' <s4> ')'
          | <s4> '&' <s4>
-	 | <s4> '|' <s4>
-	 | '!' <s4>
-	 | <class>
+         | <s4> '|' <s4>
+         | '!' <s4>
+         | <class>
 
 <class>  ::= <object>
 
@@ -53,5 +53,5 @@ The grammar below provides a method for developing valid SpRE patterns.
 
 <range>  ::= '{' <integer> '}'
          | '{' <integer> ',' '}'
-	 | '{' <integer> ',' <integer> '}'
+         | '{' <integer> ',' <integer> '}'
 ```
